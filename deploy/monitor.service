@@ -1,0 +1,79 @@
+[Unit]
+Description=Server Panel resource + SSH login monitor (HTTP behind nginx, 127.0.0.1:8087)
+Documentation=https://panel.example.com/
+After=network-online.target mail-panel.service
+Wants=network-online.target mail-panel.service
+
+[Service]
+Type=simple
+# Dedicated unprivileged user: the monitor must not be able to change system
+# state. The two exceptions below are narrow and deliberate.
+User=monsvc
+Group=monsvc
+# journalctl needs the systemd-journal group.
+# www-data is needed for the mail socket (/run/mail-panel/api.sock, srw-rw----
+# www-data:www-data). Without it the monitor can read /proc and the journal but
+# cannot send a single alert. Verified with a real request by deploy.sh.
+SupplementaryGroups=systemd-journal www-data
+
+# Manual SSH blocking needs exactly one capability. Ambient lets `nft` manage
+# the monitor_block table without any sudoers entry or root shell. (The traffic
+# filter's nginx helper is the one separate exception, listed in
+# /etc/sudoers.d/monitor-nginx-tf; that is why NoNewPrivileges is false.)
+AmbientCapabilities=CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_DAC_OVERRIDE CAP_CHOWN CAP_SETUID CAP_SETGID CAP_SYS_PTRACE
+
+WorkingDirectory=/opt/monitor
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=8087
+Environment=DATA_DIR=/var/lib/monitor
+# Alerts go through the mail panel's local socket, never to Resend directly:
+# one place holds the API key, one place enforces the send quota.
+Environment=MAIL_API_SOCKET=/run/mail-panel/api.sock
+Environment=ALERT_TO=admin@example.com
+Environment=PUBLIC_URL=https://panel.example.com/
+# Hard allowlist: these IPs can never be blocked, even if the guard logic would
+# otherwise permit it. Replace 203.0.113.11 with your own fixed admin/login
+# source. It is pinned here as well as being caught by the "has logged in"
+# rule — two independent reasons it cannot be locked out.
+Environment=PROTECTED_IPS=203.0.113.11
+Environment=SAMPLE_INTERVAL_MS=60000
+Environment=SSH_POLL_MS=20000
+# MONITOR_PASSWORD, MONITOR_SECRET, MAIL_API_KEY_ID, MAIL_API_SECRET
+EnvironmentFile=/etc/monitor/monitor.env
+
+ExecStart=/usr/bin/node /opt/monitor/server.js
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=monitor
+
+NoNewPrivileges=false
+PrivateTmp=true
+# `full`/`strict` would also make /etc and /var read-only inside this unit's
+# mount namespace — including any child that sudo elevates. The nginx traffic
+# filter needs exactly one root child (the sudoers-listed helper) to write
+# /etc/nginx and reload nginx, so /etc must stay writable for that child. The
+# unprivileged service itself still cannot write it: monsvc has no permission,
+# and the only root command it may run is the fixed helper below. Everything
+# outside /etc/nginx, /var/www/blocked.example.com and this unit's own data
+# directory is still read-only.
+ProtectSystem=yes
+ProtectHome=true
+ProtectControlGroups=true
+# Deliberately NOT set: ProtectKernelTunables, ProtectKernelModules,
+# RestrictAddressFamilies and LockPersonality. Each of them makes systemd set
+# PR_SET_NO_NEW_PRIVS, and sudo then refuses to elevate ("the no new privileges
+# flag is set") even with a NOPASSWD rule. The capability bounding set below
+# still denies CAP_SYS_MODULE/CAP_SYS_ADMIN, so this process cannot load modules
+# or change kernel tunables anyway; the only privilege it can gain is the single
+# helper command listed in /etc/sudoers.d/monitor-nginx-tf.
+
+StateDirectory=monitor
+StateDirectoryMode=0750
+ReadWritePaths=/var/lib/monitor
+
+[Install]
+WantedBy=multi-user.target

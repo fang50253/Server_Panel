@@ -1,0 +1,1437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Server Panel 资源监控</title>
+<style>
+:root{
+  color-scheme: light;
+  --bg:#f4f5f7; --card:#fff; --line:#e5e7eb; --ink:#111827; --muted:#6b7280;
+  --good:#059669; --warn:#d97706; --bad:#dc2626; --accent:#111827;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size:14px;line-height:1.5}
+header{background:#fff;border-bottom:1px solid var(--line);padding:14px 20px;
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;position:sticky;top:0;z-index:5}
+header h1{font-size:16px;margin:0;font-weight:650}
+header .chip{font-size:12px;color:var(--muted)}
+header .sp{flex:1}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);
+  background:#fff;padding:7px 13px;color:var(--ink)}
+button:hover{background:#f9fafb}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+button.primary:hover{opacity:.9}
+button.danger{color:var(--bad);border-color:#fecaca}
+button.mini{font-size:12px;padding:4px 9px;border-radius:6px;white-space:nowrap}
+button.block{color:var(--bad);border-color:#fecaca}
+button.block:hover{background:#fef2f2}
+button.block:disabled{color:#9ca3af;border-color:var(--line);background:#f9fafb;cursor:not-allowed}
+main{max-width:1080px;margin:0 auto;padding:20px;display:grid;gap:16px}
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+.card h2{font-size:13px;margin:0 0 14px;color:var(--muted);font-weight:600;
+  letter-spacing:.04em;text-transform:uppercase}
+.metric .val{font-size:30px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.metric .sub{font-size:12px;color:var(--muted);margin-top:4px}
+.bar{height:6px;border-radius:99px;background:#eef0f3;margin-top:12px;overflow:hidden}
+.bar>i{display:block;height:100%;width:0;background:var(--good);transition:width .4s,background .4s}
+.bar>i.warn{background:var(--warn)}
+.bar>i.bad{background:var(--bad)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.row+.row{margin-top:12px}
+label.f{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted);flex:1;min-width:130px}
+input[type=number],input[type=text],select{font:inherit;padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;
+  width:100%;background:#fff;color:var(--ink)}
+input:disabled{background:#f3f4f6;color:var(--muted);cursor:not-allowed}
+textarea{font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;width:100%;min-height:230px;
+  padding:10px;border:1px solid #d1d5db;border-radius:8px;background:#fff;color:var(--ink);resize:vertical}
+details.tf-page{margin-top:12px}
+details.tf-page summary{cursor:pointer;font-size:12px;color:var(--muted);padding:4px 0}
+.switch{display:flex;align-items:center;gap:10px;padding:12px 0;border-top:1px solid var(--line)}
+.switch:first-of-type{border-top:0}
+.switch .t{flex:1}
+.switch .t b{display:block;font-size:14px;font-weight:600}
+.switch .t span{font-size:12px;color:var(--muted)}
+.toggle{position:relative;width:44px;height:25px;flex:none}
+.toggle input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer}
+.toggle i{position:absolute;inset:0;background:#d1d5db;border-radius:99px;transition:background .2s;
+  pointer-events:none}
+.toggle i:before{content:"";position:absolute;left:3px;top:3px;width:19px;height:19px;border-radius:50%;
+  background:#fff;transition:transform .2s;box-shadow:0 1px 2px rgb(0 0 0/.2)}
+.toggle input:checked + i{background:var(--good)}
+.toggle input:checked + i:before{transform:translateX(19px)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600}
+th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
+th.sortable:hover{color:var(--ink)}
+.pager{display:flex;align-items:center;gap:12px;padding-top:10px;font-size:12px;color:var(--muted)}
+.pager span{white-space:nowrap}
+.country-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px 10px;
+  max-height:220px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:13px}
+.country-grid label{display:flex;align-items:center;gap:6px;white-space:nowrap;cursor:pointer}
+td.mono,.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+.empty{color:var(--muted);font-size:13px;padding:10px 0}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);
+  background:#111827;color:#fff;padding:10px 16px;border-radius:9px;font-size:13px;
+  opacity:0;transition:.25s;pointer-events:none;max-width:90vw}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+.pill{display:inline-block;font-size:11px;padding:2px 7px;border-radius:99px;background:#eef0f3;color:#374151;white-space:nowrap}
+.pill.ok{background:#d1fae5;color:#065f46}
+.pill.warn{background:#fef3c7;color:#92400e}
+.pill.no{background:#fee2e2;color:#991b1b}
+.hint{font-size:12px;color:var(--muted);margin:10px 0 0}
+details summary{cursor:pointer;font-size:12px;color:var(--muted)}
+/* Left-hand module index. Desktop only: on a phone the list would eat the
+   screen, and the page is short enough to scroll. */
+.layout{display:block}
+.toc{position:fixed;left:0;top:var(--hdr,63px);bottom:0;width:208px;z-index:4;
+  overflow-y:auto;padding:18px 10px 28px;border-right:1px solid var(--line);background:#fff}
+.toc h3{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+  font-weight:600;margin:0 0 8px;padding:0 8px}
+.toc a{display:block;padding:7px 10px;border-radius:8px;color:#374151;text-decoration:none;
+  font-size:13px;line-height:1.35;transition:background .15s,color .15s}
+.toc a:hover{background:#f3f4f6;color:var(--ink)}
+.toc a.active{background:#eef2ff;color:#3730a3;font-weight:600}
+section[id]{scroll-margin-top:calc(var(--hdr,63px) + 14px)}
+html{scroll-behavior:smooth}
+@media (min-width:1024px){.layout{padding-left:208px}}
+@media (max-width:1023px){.toc{display:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Server Panel 资源监控</h1>
+  <span class="chip" id="hostChip">—</span>
+  <span class="sp"></span>
+  <span class="chip" id="beat">等待数据…</span>
+  <button id="btnRefresh">刷新</button>
+  <button id="btnLogout" class="danger">退出</button>
+</header>
+
+<div class="layout">
+<nav class="toc" aria-label="模块索引">
+  <h3>模块索引</h3>
+  <a href="#sec-resources">资源占用</a>
+  <a href="#sec-alertswitch">告警开关</a>
+  <a href="#sec-rules">判定规则</a>
+  <a href="#sec-failrules">登录失败判定</a>
+  <a href="#sec-autoblock">自动封锁</a>
+  <a href="#sec-geoip">SSH 国家白名单</a>
+  <a href="#sec-trafficfilter">网络流量过滤</a>
+  <a href="#sec-history">最近告警</a>
+  <a href="#sec-fails">失败的登录尝试</a>
+  <a href="#sec-blocked">已拉黑的 IP</a>
+  <a href="#sec-ips">已记录的登录 IP</a>
+</nav>
+
+<main>
+  <section class="grid" id="sec-resources">
+    <div class="card metric">
+      <h2>CPU</h2>
+      <div class="val" id="cpuVal">—</div>
+      <div class="bar"><i id="cpuBar"></i></div>
+      <div class="sub" id="cpuSub">—</div>
+    </div>
+    <div class="card metric">
+      <h2>内存</h2>
+      <div class="val" id="memVal">—</div>
+      <div class="bar"><i id="memBar"></i></div>
+      <div class="sub" id="memSub">—</div>
+    </div>
+    <div class="card metric">
+      <h2>网络</h2>
+      <div class="val" id="netVal">—</div>
+      <div class="bar"><i id="netBar"></i></div>
+      <div class="sub" id="netSub">—</div>
+    </div>
+  </section>
+
+  <section class="card" id="sec-alertswitch">
+    <h2>告警开关</h2>
+    <div class="switch">
+      <div class="t">
+        <b>资源占用提醒</b>
+        <span>每分钟检测一次 CPU、内存、网络，持续超阈值时发信</span>
+      </div>
+      <label class="toggle"><input type="checkbox" id="swResource"><i></i></label>
+    </div>
+    <div class="switch">
+      <div class="t">
+        <b>全新 IP 登录提醒</b>
+        <span>每次 SSH 登录都核对，只有从未出现过的 IP 才发信</span>
+      </div>
+      <label class="toggle"><input type="checkbox" id="swSsh"><i></i></label>
+    </div>
+    <div class="switch">
+      <div class="t">
+        <b>登录失败密集提醒</b>
+        <span>记录每一次失败尝试；同一 IP 在窗口内失败达到次数就发信</span>
+      </div>
+      <label class="toggle"><input type="checkbox" id="swSshFail"><i></i></label>
+    </div>
+    <p class="hint">关闭开关立即生效：检测和记录仍在继续（数据继续显示），只是不再发信。资源开关关闭时用量仍会每分钟采样。</p>
+  </section>
+
+  <section class="card" id="sec-rules">
+    <h2>判定规则</h2>
+    <div class="row">
+      <label class="f">CPU 阈值（%）
+        <input type="number" id="rCpu" min="1" max="100" step="1">
+      </label>
+      <label class="f">内存阈值（%）
+        <input type="number" id="rMem" min="1" max="100" step="1">
+      </label>
+      <label class="f">网络阈值（Mbps）
+        <input type="number" id="rNet" min="0.1" max="100000" step="0.1">
+      </label>
+    </div>
+    <div class="row">
+      <label class="f">连续次数
+        <input type="number" id="rConsec" min="1" max="1440" step="1">
+      </label>
+      <label class="f">统计窗口（分钟）
+        <input type="number" id="rWinMin" min="1" max="1440" step="1">
+      </label>
+      <label class="f">窗口内次数
+        <input type="number" id="rWinCount" min="1" max="10000" step="1">
+      </label>
+    </div>
+    <div class="row">
+      <label class="f">两个条件的关系
+        <select id="rCombine">
+          <option value="any">任一满足即告警（推荐）</option>
+          <option value="all">必须同时满足</option>
+        </select>
+      </label>
+      <label class="f">告警冷却（分钟）
+        <input type="number" id="rCooldown" min="1" max="1440" step="1">
+      </label>
+    </div>
+    <p class="hint" id="ruleHint"></p>
+    <div class="row" style="margin-top:14px">
+      <button class="primary" id="btnSave">保存规则</button>
+      <button id="btnReset">恢复默认</button>
+      <button id="btnTestResource">发送资源告警测试</button>
+      <button id="btnTestSsh">发送登录告警测试</button>
+      <button id="btnTestSshFail">发送失败告警测试</button>
+    </div>
+  </section>
+
+  <section class="card" id="sec-failrules">
+    <h2>登录失败判定</h2>
+    <div class="row">
+      <label class="f">窗口内失败次数
+        <input type="number" id="fCount" min="1" max="10000" step="1">
+      </label>
+      <label class="f">统计窗口（分钟）
+        <input type="number" id="fWinMin" min="1" max="1440" step="1">
+      </label>
+      <label class="f">同一 IP 冷却（分钟）
+        <input type="number" id="fCooldown" min="1" max="1440" step="1">
+      </label>
+    </div>
+    <p class="hint" id="failHint"></p>
+    <button class="mini" id="btnSaveFail">保存修改</button>
+  </section>
+
+  <section class="card" id="sec-autoblock">
+    <h2>自动封锁</h2>
+    <div class="switch">
+      <div class="t">
+        <b>失败次数达到阈值时自动封锁该 IP</b>
+        <span>关闭时只能手动点「封锁」。开启后由服务自动执行，记录中标为「自动」。</span>
+      </div>
+      <label class="toggle"><input type="checkbox" id="swAutoBlock"><i></i></label>
+    </div>
+    <div class="row">
+      <label class="f">窗口内失败次数
+        <input type="number" id="abCount" min="2" max="100000" step="1">
+      </label>
+      <label class="f">统计窗口（分钟）
+        <input type="number" id="abWinMin" min="1" max="10080" step="1">
+      </label>
+    </div>
+    <p class="hint" id="autoBlockHint"></p>
+    <p class="hint">自动封锁同样受安全规则约束：成功登录过、有已登录会话、受保护 IP、内网地址一律不封。</p>
+    <button class="mini" id="btnSaveAutoBlock">保存修改</button>
+  </section>
+
+  <section class="card" id="sec-geoip">
+    <h2>SSH 国家/地区过滤</h2>
+    <div class="switch">
+      <div class="t">
+        <b>开启允许连接SSH的国家/地区白名单</b>
+        <span>开启后，只有勾选的国家/地区能连接 SSH（22 端口），其余直接拒绝；网站、邮件等其他端口不受影响</span>
+      </div>
+      <label class="toggle"><input type="checkbox" id="swGeoip"><i></i></label>
+    </div>
+    <p class="hint" id="geoipHint"></p>
+    <div class="hint"><b>允许的国家/地区</b>（勾选后点「保存国家列表」立即生效）</div>
+    <div id="geoipCountryList" class="country-grid"></div>
+    <div class="hint" style="display:flex;gap:10px;align-items:center;margin-top:8px">
+      <span id="geoipCount">—</span>
+      <button class="mini" id="geoipSelectAll">全选</button>
+      <button class="mini" id="geoipSelectNone">清空</button>
+      <button class="mini" id="btnSaveGeoipCountries">保存国家列表</button>
+    </div>
+    <p class="hint">受保护 IP、成功登录过的 IP 和本机地址始终放行；已拉黑的 IP 仍然优先拦截。数据来自 ipdeny.com，每天自动更新。</p>
+  </section>
+
+  <section class="card" id="sec-trafficfilter">
+    <h2>网络流量过滤</h2>
+    <div class="switch">
+      <div class="t">
+        <b>开启流量过滤</b>
+        <span>在防火墙层按下面的规则拦截或放行指定来源的流量。规则按优先级从上往下匹配，第一条命中的规则决定结果。</span>
+      </div>
+      <label class="toggle"><input type="checkbox" id="swTraffic"><i></i></label>
+    </div>
+    <p class="hint" id="trafficHint"></p>
+
+    <div class="row" style="margin-top:12px">
+      <label class="f">对被拦截的 HTTP / HTTPS 请求
+        <select id="tfMode">
+          <option value="drop">直接丢弃（连接超时，不返回任何内容）</option>
+          <option value="404">静默失败（返回 HTTP 404）</option>
+          <option value="redirect">失败页（跳转到 blocked.example.com）</option>
+        </select>
+      </label>
+      <span class="hint" id="tfModeHint" style="margin:0"></span>
+    </div>
+
+    <details class="tf-page" id="tfPageBox">
+      <summary>失败页内容（https://blocked.example.com/ 的 HTML，可编辑）</summary>
+      <p class="hint">「失败页」模式下，被拦截的访客会被 302 跳转到这个独立域名。下面就是该页面的完整 HTML，保存后立即生效；默认版本按访客浏览器的语言显示提示，没有匹配语言时使用英语。</p>
+      <textarea id="tfFailedHtml" spellcheck="false" autocomplete="off"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="primary" id="btnTfPageSave">保存失败页</button>
+        <button class="mini" id="btnTfPageDefault">恢复默认</button>
+        <span class="hint" id="tfFailedHint" style="margin:0"></span>
+      </div>
+    </details>
+
+    <div class="row">
+      <label class="f">匹配类型
+        <select id="tfType">
+          <option value="ip">单个 IP</option>
+          <option value="cidr">IP 段（CIDR）</option>
+          <option value="country">国家 / 地区</option>
+        </select>
+      </label>
+      <label class="f" id="tfValueWrap">IP 地址 / 网段
+        <input type="text" id="tfValue" placeholder="如 203.0.113.9" autocomplete="off">
+      </label>
+      <label class="f" id="tfCountryWrap" style="display:none">国家 / 地区
+        <select id="tfCountry"></select>
+      </label>
+    </div>
+
+    <div class="row">
+      <label class="f">端口 / 协议
+        <select id="tfPortPreset">
+          <option value="80,443">HTTP + HTTPS（80, 443）</option>
+          <option value="80">HTTP（80）</option>
+          <option value="443">HTTPS（443）</option>
+          <option value="22">SSH（22）</option>
+          <option value="25,110,143,465,587,993,995">邮件（SMTP / IMAP / POP3）</option>
+          <option value="53">DNS（53）</option>
+          <option value="3306">MySQL（3306）</option>
+          <option value="5432">PostgreSQL（5432）</option>
+          <option value="6379">Redis（6379）</option>
+          <option value="all">所有端口 / 所有协议</option>
+          <option value="custom">其他（自定义端口 / 正则）</option>
+        </select>
+      </label>
+      <label class="f">自定义端口（选「其他」时可填）
+        <input type="text" id="tfPortCustom" placeholder="80,443 或 8000-8100 或 8\d{3}" autocomplete="off" disabled>
+      </label>
+    </div>
+
+    <div class="row">
+      <label class="f">动作
+        <select id="tfAction">
+          <option value="block">拦截</option>
+          <option value="allow">放行</option>
+        </select>
+      </label>
+      <label class="f">优先级（数字越小越先匹配）
+        <input type="number" id="tfPriority" min="1" max="100000" step="1" value="100">
+      </label>
+      <label class="f">状态
+        <select id="tfEnabled">
+          <option value="1">启用</option>
+          <option value="0">停用</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="row" style="margin-top:12px">
+      <button class="primary" id="btnTfSave">添加规则</button>
+      <button class="mini" id="btnTfCancel" style="display:none">取消编辑</button>
+      <span class="hint" id="tfFormHint" style="margin:0"></span>
+    </div>
+
+    <p class="hint">端口规则同时拦截 TCP 与 UDP，避免 QUIC / HTTP3 绕过；选「所有端口」时对 ICMP 等全部协议生效，请谨慎使用。自定义端口的「其他」支持端口列表、范围，或对十进制端口号整体匹配的正则（如 <span class="mono">8\d{3}</span>）。受保护 IP、成功登录过的 IP、本机地址和你当前访问的地址会在<b>所有规则之前</b>自动放行，所以「拦截中国大陆」这类规则不会把你关在门外。公共站点在 Cloudflare 后面时，nginx 会从 Cloudflare 网段信任 <span class="mono">CF-Connecting-IP</span> 还原访客真实 IP，因此按国家/IP 的规则对经过 Cloudflare 的浏览器访问同样生效；<b>静默失败</b>和<b>失败页</b>模式还会用 Cloudflare 的 <span class="mono">CF-IPCountry</span> 补充国家判断，显式放行和自动豁免仍然优先。</p>
+    <div id="tfRules"><div class="empty">暂无规则</div></div>
+  </section>
+
+  <section class="card" id="sec-history">
+    <h2>最近告警</h2>
+    <div id="history"><div class="empty">暂无记录</div></div>
+  </section>
+
+  <section class="card" id="sec-fails">
+    <h2>失败的登录尝试</h2>
+    <p class="hint" id="failTableHint">同一 IP 在窗口内的失败次数，达到阈值就会发信。</p>
+    <div id="fails"><div class="empty">暂无记录</div></div>
+    <p class="hint">「失败次数」只统计当前窗口内的尝试，窗口滑过会减少；「首次」「最近」来自永久记录，一旦出现就会保留，直到手动清空。</p>
+    <p class="hint"><button class="mini" id="btnClearHistory">清空失败历史</button> 只清除「首次 / 最近 / 累计次数」的永久记录，不会解锁任何 IP，也不影响当前窗口的统计。</p>
+  </section>
+
+  <section class="card" id="sec-blocked">
+    <h2>已拉黑的 IP</h2>
+    <p class="hint" id="blockedHint">被封锁的 IP 在 SSH 端口上的连接会被内核直接丢弃，尝试仍会持续记录在这里。</p>
+    <div id="blocked"><div class="empty">暂无记录</div></div>
+  </section>
+
+  <section class="card" id="sec-ips">
+    <h2>已记录的登录 IP</h2>
+    <p class="hint">成功登录过的 IP 都会记录；只有首次出现的公网 IP 会发信，之后同一 IP 再登录不会重复提醒。</p>
+    <div id="ips"><div class="empty">暂无记录</div></div>
+  </section>
+</main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+let csrf = '';
+let state = null;
+
+const $ = (id) => document.getElementById(id);
+
+function toast(msg, ms = 2600) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('on');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('on'), ms);
+}
+
+async function api(path, opts = {}) {
+  const headers = { ...(opts.headers || {}) };
+  if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
+  if (opts.method && opts.method !== 'GET') headers['x-csrf-token'] = csrf;
+  const res = await fetch(path, { ...opts, headers, credentials: 'same-origin' });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401) { location.href = '/login'; throw new Error('unauthorized'); }
+  if (!res.ok || data.ok === false) throw new Error(data.message || data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+function pct(n) {
+  if (n === null || n === undefined || !isFinite(n)) return '—';
+  return n.toFixed(1) + '%';
+}
+
+function bar(el, ratio, warnAt = 0.7, badAt = 0.9) {
+  const p = Math.max(0, Math.min(1, ratio || 0));
+  el.style.width = (p * 100).toFixed(1) + '%';
+  el.className = p >= badAt ? 'bad' : p >= warnAt ? 'warn' : '';
+}
+
+function mbps(n) {
+  if (n === null || n === undefined || !isFinite(n)) return '—';
+  if (n >= 100) return n.toFixed(0) + ' Mbps';
+  if (n >= 10) return n.toFixed(1) + ' Mbps';
+  return n.toFixed(2) + ' Mbps';
+}
+
+function bytes(n) {
+  if (!n) return '0 B';
+  const u = ['B','KB','MB','GB','TB'];
+  let v = n, i = 0;
+  while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+  return v.toFixed(i ? 1 : 0) + ' ' + u[i];
+}
+
+function ago(ms) {
+  if (!ms) return '—';
+  const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
+  if (s < 60) return s + ' 秒前';
+  if (s < 3600) return Math.round(s / 60) + ' 分钟前';
+  if (s < 86400) return Math.round(s / 3600) + ' 小时前';
+  return Math.round(s / 86400) + ' 天前';
+}
+
+function fmtTime(ms) {
+  if (!ms) return '—';
+  const d = new Date(ms);
+  const p = (x) => String(x).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate()) + ' ' +
+         p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+}
+
+function renderStatus(d) {
+  state = d;
+  $('hostChip').textContent = d.host + ' · 每 ' + Math.round(d.sampleIntervalMs / 1000) + ' 秒检测';
+
+  const s = d.sample || {};
+  $('cpuVal').textContent = pct(s.cpuPercent);
+  bar($('cpuBar'), (s.cpuPercent || 0) / 100, d.rules.cpuPercent / 100 * 0.8, d.rules.cpuPercent / 100);
+  $('cpuSub').textContent = s.cpuCores ? s.cpuCores + ' 核 · 阈值 ' + d.rules.cpuPercent + '%' : '阈值 ' + d.rules.cpuPercent + '%';
+
+  $('memVal').textContent = pct(s.memPercent);
+  bar($('memBar'), (s.memPercent || 0) / 100, d.rules.memPercent / 100 * 0.8, d.rules.memPercent / 100);
+  $('memSub').textContent = s.mem
+    ? bytes(s.mem.usedBytes) + ' / ' + bytes(s.mem.totalBytes) + ' · 可用 ' + bytes(s.mem.availableBytes)
+    : '阈值 ' + d.rules.memPercent + '%';
+
+  const net = s.net;
+  $('netVal').textContent = net ? mbps(net.totalMbps) : '—';
+  bar($('netBar'), net ? net.totalMbps / d.rules.netMbps : 0, 0.7, 1);
+  $('netSub').textContent = net
+    ? '入 ' + mbps(net.rxMbps) + ' · 出 ' + mbps(net.txMbps) + ' · 阈值 ' + d.rules.netMbps + ' Mbps'
+    : '阈值 ' + d.rules.netMbps + ' Mbps';
+
+  $('beat').textContent = d.lastSampleAt ? '采样于 ' + ago(d.lastSampleAt) : '等待采样…';
+
+  $('swResource').checked = !!d.rules.enabled;
+  $('swSsh').checked = !!d.rules.sshAlertsEnabled;
+  $('swSshFail').checked = !!d.rules.sshFailAlertsEnabled;
+
+  fillRules(d.rules);
+}
+
+function fillRules(r) {
+  $('rCpu').value = r.cpuPercent;
+  $('rMem').value = r.memPercent;
+  $('rNet').value = r.netMbps;
+  $('rConsec').value = r.consecutive;
+  $('rWinMin').value = r.windowMinutes;
+  $('rWinCount').value = r.windowCount;
+  $('rCombine').value = r.combine;
+  $('rCooldown').value = r.cooldownMinutes;
+  $('fCount').value = r.sshFailCount;
+  $('fWinMin').value = r.sshFailWindowMinutes;
+  $('fCooldown').value = r.sshFailCooldownMinutes;
+  $('swAutoBlock').checked = !!r.autoBlockEnabled;
+  $('abCount').value = r.autoBlockCount;
+  $('abWinMin').value = r.autoBlockWindowMinutes;
+  updateHint();
+}
+
+function updateHint() {
+  const c = $('rConsec').value || '3';
+  const m = $('rWinMin').value || '60';
+  const n = $('rWinCount').value || '10';
+  const mode = $('rCombine').value;
+  const rel = mode === 'all' ? '同时满足' : '任一满足';
+  $('ruleHint').textContent =
+    '当前规则：连续 ' + c + ' 次超阈值，或 ' + m + ' 分钟内累计 ' + n + ' 次超阈值（' + rel + '）即告警；' +
+    '同一指标告警后冷却 ' + ($('rCooldown').value || '30') + ' 分钟。检测间隔 60 秒。';
+
+  $('failHint').textContent =
+    '同一 IP 在 ' + ($('fWinMin').value || '60') + ' 分钟内失败达到 ' +
+    ($('fCount').value || '3') + ' 次即发信；之后 ' +
+    ($('fCooldown').value || '60') + ' 分钟内同一 IP 不重复提醒。检测间隔 20 秒。修改后点「保存修改」。';
+
+  const abOn = $('swAutoBlock').checked;
+  const abCount = $('abCount').value || '100';
+  const abWin = $('abWinMin').value || '1440';
+  $('autoBlockHint').textContent = abOn
+    ? '已开启：同一 IP 在 ' + abWin + ' 分钟内失败达到 ' + abCount +
+      ' 次，会自动加入封锁列表（来源标记为「自动」）。检测间隔 20 秒。修改后点「保存修改」。'
+    : '已关闭：失败只记录和告警，不会自动封锁任何 IP。';
+}
+
+/* ---------------------------------------------------- sortable, paged tables */
+
+// One page holds 10 rows: the whole panel is a dashboard, and long lists are
+// meant to be sorted or paged through, not scrolled past.
+const PAGE_SIZE = 10;
+
+// Sort/order/page per section, kept across the periodic re-renders so an
+// auto-refresh never yanks the user back to page 1 of the default sort.
+const tableState = {};
+
+function sortValue(v) {
+  if (v === null || v === undefined || v === '') return null;
+  if (typeof v === 'number' && !isFinite(v)) return null;
+  return v;
+}
+
+function cmpValues(a, b) {
+  if (typeof a === 'number' && typeof b === 'number') return a - b;
+  return String(a).localeCompare(String(b), 'zh');
+}
+
+/**
+ * Render rows as a table with click-to-sort headers and pagination.
+ *
+ * columns: [{ name, sort: row => value | null, render: row => html }]
+ * `sort` null/undefined marks a purely visual column (buttons, pills) with no
+ * header click. Sort state and page live in tableState[key]; header clicks and
+ * pager clicks re-render from the same `rows` array until the next refresh
+ * delivers fresh data.
+ */
+function renderDataTable(key, elId, columns, rows, opts = {}) {
+  const st = tableState[key] || (tableState[key] = {
+    ci: opts.defaultCi === undefined ? -1 : opts.defaultCi,
+    desc: opts.defaultDesc === undefined ? true : opts.defaultDesc,
+    page: 0,
+  });
+  const el = $(elId);
+  if (!rows.length) {
+    el.innerHTML = '<div class="empty">' + escapeHtml(opts.emptyText || '暂无记录') + '</div>';
+    if (opts.afterRender) opts.afterRender();
+    return;
+  }
+
+  let sorted = rows.slice();
+  if (st.ci >= 0 && columns[st.ci] && columns[st.ci].sort) {
+    const keyFn = columns[st.ci].sort;
+    sorted.sort((a, b) => {
+      const va = sortValue(keyFn(a));
+      const vb = sortValue(keyFn(b));
+      if (va === null && vb === null) return 0;
+      if (va === null) return 1;
+      if (vb === null) return -1;
+      const cmp = cmpValues(va, vb);
+      return st.desc ? -cmp : cmp;
+    });
+  }
+
+  const pages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  if (st.page >= pages) st.page = pages - 1;
+  if (st.page < 0) st.page = 0;
+  const pageRows = sorted.slice(st.page * PAGE_SIZE, st.page * PAGE_SIZE + PAGE_SIZE);
+
+  const head = columns.map((c, i) => {
+    if (typeof c.sort !== 'function') return '<th>' + escapeHtml(c.name) + '</th>';
+    const arrow = st.ci === i ? (st.desc ? ' ▾' : ' ▴') : '';
+    return '<th class="sortable" data-ci="' + i + '" title="点击排序">' + escapeHtml(c.name) + arrow + '</th>';
+  }).join('');
+
+  const body = pageRows.map((r) => '<tr>' + columns.map((c) => '<td>' + c.render(r) + '</td>').join('') + '</tr>').join('');
+
+  let pager = '';
+  if (pages > 1) {
+    pager =
+      '<div class="pager">' +
+      '<button class="mini" data-page="' + (st.page - 1) + '"' + (st.page === 0 ? ' disabled' : '') + '>上一页</button>' +
+      '<span>第 ' + (st.page + 1) + ' / ' + pages + ' 页 · 共 ' + sorted.length + ' 条</span>' +
+      '<button class="mini" data-page="' + (st.page + 1) + '"' + (st.page >= pages - 1 ? ' disabled' : '') + '>下一页</button>' +
+      '</div>';
+  }
+
+  el.innerHTML = '<table><thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table>' + pager;
+
+  el.querySelectorAll('th.sortable').forEach((th) => {
+    th.onclick = () => {
+      const ci = Number(th.dataset.ci);
+      if (st.ci === ci) st.desc = !st.desc;
+      else { st.ci = ci; st.desc = true; }
+      st.page = 0;
+      renderDataTable(key, elId, columns, rows, opts);
+    };
+  });
+  el.querySelectorAll('button[data-page]').forEach((btn) => {
+    btn.onclick = () => {
+      st.page = Number(btn.dataset.page);
+      renderDataTable(key, elId, columns, rows, opts);
+    };
+  });
+
+  if (opts.afterRender) opts.afterRender();
+}
+
+function renderHistory(alerts) {
+  const KIND = {
+    resource: '资源',
+    ssh: '新 IP 登录',
+    'ssh-fail': '失败密集',
+    'test-resource': '测试·资源',
+    'test-ssh': '测试·登录',
+    'test-ssh-fail': '测试·失败',
+  };
+  renderDataTable('history', 'history', [
+    { name: '时间', sort: (a) => Date.parse(a.ts), render: (a) => '<span class="mono">' + fmtTime(Date.parse(a.ts)) + '</span>' },
+    { name: '类型', sort: (a) => KIND[a.kind] || a.kind || '', render: (a) => escapeHtml(KIND[a.kind] || a.kind || '—') },
+    { name: '标题', sort: (a) => a.title || '', render: (a) => escapeHtml(a.title || '') },
+    { name: '状态', sort: (a) => (a.ok ? 1 : 0), render: (a) => a.ok ? '<span class="pill ok">已发送</span>' : '<span class="pill no">失败</span>' },
+    { name: '详情', sort: null, render: (a) => a.ok ? (a.id ? '<span class="mono">' + escapeHtml(a.id.slice(0, 18)) + '…</span>' : '') : escapeHtml(a.error || '') },
+  ], alerts, { defaultCi: 0, defaultDesc: true });
+}
+
+function renderIps(list) {
+  renderDataTable('ips', 'ips', [
+    { name: 'IP', sort: (r) => r.ip, render: (r) => '<span class="mono">' + escapeHtml(r.ip) + '</span>' },
+    { name: '国家/地区', sort: (r) => ((r.geo || {}).error ? '' : (r.geo || {}).country || ''),
+      render: (r) => {
+        const g = r.geo || {};
+        return g.error ? '<span class="pill no">未知</span>' : escapeHtml([g.country, g.city].filter(Boolean).join(' · ') || '—');
+      } },
+    { name: '用户', sort: (r) => r.user || '', render: (r) => escapeHtml(r.user || '—') },
+    { name: '首次', sort: (r) => r.firstSeen || null, render: (r) => fmtTime(r.firstSeen) },
+    { name: '最近', sort: (r) => r.lastSeen || null, render: (r) => fmtTime(r.lastSeen) },
+    { name: '次数', sort: (r) => r.count || 0, render: (r) => r.count || 1 },
+  ], list, { defaultCi: 4, defaultDesc: true });
+}
+
+function renderFails(data) {
+  const list = (data && data.ips) || [];
+  if (!data || !data.ips) { $('fails').innerHTML = '<div class="empty">暂无记录</div>'; return; }
+  $('failTableHint').textContent =
+    '统计窗口 ' + data.windowMinutes + ' 分钟，失败达到 ' + data.threshold + ' 次即发信。' +
+    '共 ' + list.length + ' 个来源 IP（含历史记录）。';
+  if (!list.length) { $('fails').innerHTML = '<div class="empty">窗口内没有失败记录</div>'; return; }
+
+  const prot = new Set((data.protectedIps || []).map((s) => s));
+
+  renderDataTable('fails', 'fails', [
+    {
+      name: '操作', sort: null,
+      render: (r) => {
+        if (r.blocked) {
+          return r.blockSource === 'auto'
+            ? '<span class="pill warn">已拉黑·自动</span>'
+            : r.blockSource === 'manual'
+              ? '<span class="pill no">已拉黑·手动</span>'
+              : '<span class="pill no">已拉黑</span>';
+        }
+        if (prot.has(r.ip)) return '<button class="mini block" disabled title="受保护，不允许封锁">封锁</button>';
+        if (!r.count) return '<button class="mini block" disabled title="没有失败记录">封锁</button>';
+        return '<button class="mini block" data-block="' + escapeHtml(r.ip) + '">封锁</button>';
+      },
+    },
+    { name: 'IP', sort: (r) => r.ip, render: (r) => '<span class="mono">' + escapeHtml(r.ip) + '</span>' },
+    {
+      name: '失败次数', sort: (r) => r.count || 0,
+      render: (r) => r.blocked && typeof r.droppedSinceBlock === 'number'
+        ? (r.count || 0) + ' <span class="pill">封锁后 ' + r.droppedSinceBlock + '</span>'
+        : (r.count || 0),
+    },
+    // 累计 is the permanent count: it never decays, it survives restarts, and
+    // it is only reset by the explicit clear button.
+    { name: '累计', sort: (r) => r.totalEver || 0, render: (r) => r.totalEver || '—' },
+    {
+      name: '状态', sort: (r) => (r.blocked ? 2 : (r.count >= r.threshold ? 1 : 0)),
+      render: (r) => (r.count >= r.threshold ? '<span class="pill no">已达阈值</span>' : '<span class="pill">未达阈值</span>'),
+    },
+    { name: '尝试的用户名', sort: (r) => (r.users || []).join(', '), render: (r) => escapeHtml((r.users || []).join(', ') || '—') },
+    { name: '首次', sort: (r) => r.first || null, render: (r) => fmtTime(r.first) },
+    { name: '最近', sort: (r) => r.last || null, render: (r) => fmtTime(r.last) },
+    { name: '上次提醒', sort: (r) => r.lastAlertAt || null, render: (r) => (r.lastAlertAt ? fmtTime(r.lastAlertAt) : '—') },
+  ], list, {
+    defaultCi: 3, defaultDesc: true,
+    emptyText: '窗口内没有失败记录',
+    afterRender: () => {
+      $('fails').querySelectorAll('button[data-block]').forEach((btn) => {
+        btn.onclick = () => blockIp(btn.dataset.block, btn);
+      });
+    },
+  });
+}
+
+// Full selectable country list, grouped by region so the checkbox grid is
+// browsable. Codes are ISO 3166-1 alpha-2, lowercase — the same codes the
+// ipdeny zone files are named after.
+const ALL_COUNTRIES = [
+  // 东亚 / 东南亚
+  ['cn', '中国大陆'], ['hk', '香港'], ['tw', '台湾'], ['mo', '澳门'], ['jp', '日本'], ['kr', '韩国'],
+  ['kp', '朝鲜'], ['mn', '蒙古'], ['sg', '新加坡'], ['my', '马来西亚'], ['th', '泰国'], ['vn', '越南'],
+  ['ph', '菲律宾'], ['id', '印度尼西亚'], ['in', '印度'], ['pk', '巴基斯坦'], ['bd', '孟加拉国'],
+  ['lk', '斯里兰卡'], ['np', '尼泊尔'], ['bt', '不丹'], ['mm', '缅甸'], ['kh', '柬埔寨'], ['la', '老挝'],
+  // 中东 / 中亚
+  ['tr', '土耳其'], ['ir', '伊朗'], ['iq', '伊拉克'], ['sy', '叙利亚'], ['lb', '黎巴嫩'], ['jo', '约旦'],
+  ['il', '以色列'], ['ps', '巴勒斯坦'], ['sa', '沙特阿拉伯'], ['ye', '也门'], ['om', '阿曼'],
+  ['ae', '阿联酋'], ['qa', '卡塔尔'], ['bh', '巴林'], ['kw', '科威特'], ['af', '阿富汗'],
+  ['kz', '哈萨克斯坦'], ['uz', '乌兹别克斯坦'], ['tm', '土库曼斯坦'],
+  ['kg', '吉尔吉斯斯坦'], ['tj', '塔吉克斯坦'], ['ge', '格鲁吉亚'], ['am', '亚美尼亚'], ['az', '阿塞拜疆'],
+  ['cy', '塞浦路斯'],
+  // 欧洲
+  ['gb', '英国'], ['ie', '爱尔兰'], ['fr', '法国'], ['de', '德国'], ['it', '意大利'], ['es', '西班牙'],
+  ['pt', '葡萄牙'], ['nl', '荷兰'], ['be', '比利时'], ['lu', '卢森堡'], ['ch', '瑞士'], ['at', '奥地利'],
+  ['se', '瑞典'], ['no', '挪威'], ['fi', '芬兰'], ['dk', '丹麦'], ['is', '冰岛'], ['pl', '波兰'],
+  ['cz', '捷克'], ['sk', '斯洛伐克'], ['hu', '匈牙利'], ['ro', '罗马尼亚'], ['bg', '保加利亚'],
+  ['gr', '希腊'], ['hr', '克罗地亚'], ['si', '斯洛文尼亚'], ['rs', '塞尔维亚'], ['ba', '波黑'],
+  ['me', '黑山'], ['mk', '北马其顿'], ['al', '阿尔巴尼亚'], ['xk', '科索沃'], ['md', '摩尔多瓦'],
+  ['ua', '乌克兰'], ['by', '白俄罗斯'], ['ru', '俄罗斯'], ['lt', '立陶宛'], ['lv', '拉脱维亚'],
+  ['ee', '爱沙尼亚'], ['mt', '马耳他'], ['mc', '摩纳哥'], ['sm', '圣马力诺'], ['va', '梵蒂冈'],
+  ['ad', '安道尔'], ['li', '列支敦士登'],
+  // 非洲
+  ['eg', '埃及'], ['ly', '利比亚'], ['tn', '突尼斯'], ['dz', '阿尔及利亚'], ['ma', '摩洛哥'],
+  ['sd', '苏丹'], ['et', '埃塞俄比亚'], ['ke', '肯尼亚'], ['ug', '乌干达'], ['tz', '坦桑尼亚'],
+  ['rw', '卢旺达'], ['bi', '布隆迪'], ['cd', '刚果（金）'], ['cg', '刚果（布）'], ['ga', '加蓬'],
+  ['cm', '喀麦隆'], ['ng', '尼日利亚'], ['gh', '加纳'], ['ci', '科特迪瓦'], ['sn', '塞内加尔'],
+  ['ml', '马里'], ['ne', '尼日尔'], ['td', '乍得'], ['bf', '布基纳法索'], ['gm', '冈比亚'],
+  ['gw', '几内亚比绍'], ['gn', '几内亚'], ['sl', '塞拉利昂'], ['lr', '利比里亚'], ['tg', '多哥'],
+  ['bj', '贝宁'], ['na', '纳米比亚'], ['ao', '安哥拉'], ['zm', '赞比亚'], ['mw', '马拉维'],
+  ['mz', '莫桑比克'], ['zw', '津巴布韦'], ['bw', '博茨瓦纳'], ['za', '南非'], ['ls', '莱索托'],
+  ['sz', '斯威士兰'], ['mg', '马达加斯加'], ['mu', '毛里求斯'], ['sc', '塞舌尔'], ['cv', '佛得角'],
+  ['st', '圣多美和普林西比'], ['ss', '南苏丹'], ['so', '索马里'], ['dj', '吉布提'], ['er', '厄立特里亚'],
+  ['eh', '西撒哈拉'],
+  // 北美 / 加勒比
+  ['us', '美国'], ['ca', '加拿大'], ['mx', '墨西哥'], ['gt', '危地马拉'], ['bz', '伯利兹'],
+  ['sv', '萨尔瓦多'], ['hn', '洪都拉斯'], ['ni', '尼加拉瓜'], ['cr', '哥斯达黎加'], ['pa', '巴拿马'],
+  ['cu', '古巴'], ['jm', '牙买加'], ['ht', '海地'], ['do', '多米尼加'], ['bs', '巴哈马'],
+  ['bb', '巴巴多斯'], ['tt', '特立尼达和多巴哥'], ['pr', '波多黎各'], ['ag', '安提瓜和巴布达'],
+  ['dm', '多米尼克'], ['gd', '格林纳达'], ['lc', '圣卢西亚'], ['vc', '圣文森特'], ['kn', '圣基茨'],
+  ['ai', '安圭拉'], ['aw', '阿鲁巴'], ['cw', '库拉索'], ['ky', '开曼群岛'], ['bm', '百慕大'],
+  ['ms', '蒙特塞拉特'], ['gp', '瓜德罗普'], ['gf', '法属圭亚那'],
+  // 南美
+  ['br', '巴西'], ['ar', '阿根廷'], ['cl', '智利'], ['co', '哥伦比亚'], ['pe', '秘鲁'],
+  ['ve', '委内瑞拉'], ['ec', '厄瓜多尔'], ['bo', '玻利维亚'], ['py', '巴拉圭'], ['uy', '乌拉圭'],
+  ['sr', '苏里南'], ['gy', '圭亚那'],
+  // 大洋洲
+  ['au', '澳大利亚'], ['nz', '新西兰'], ['fj', '斐济'], ['pg', '巴布亚新几内亚'], ['sb', '所罗门群岛'],
+  ['vu', '瓦努阿图'], ['ws', '萨摩亚'], ['to', '汤加'], ['ki', '基里巴斯'], ['tv', '图瓦卢'],
+  ['nr', '瑙鲁'], ['mh', '马绍尔群岛'], ['pw', '帕劳'], ['fm', '密克罗尼西亚'], ['nc', '新喀里多尼亚'],
+  ['pf', '法属波利尼西亚'],
+];
+
+const COUNTRY_NAMES = new Map(ALL_COUNTRIES);
+
+function updateGeoipCount() {
+  const total = document.querySelectorAll('#geoipCountryList input[type=checkbox]').length;
+  const checked = document.querySelectorAll('#geoipCountryList input[type=checkbox]:checked').length;
+  $('geoipCount').textContent = '已选 ' + checked + ' / ' + total + ' 个国家/地区';
+}
+
+function renderGeoip(data) {
+  if (!data) return;
+  const on = !!data.enabled;
+  $('swGeoip').checked = on;
+
+  // Build the checkbox grid once; afterwards only sync the checked state, so a
+  // tick the user just placed is never wiped by an auto-refresh mid-edit.
+  const grid = $('geoipCountryList');
+  if (!grid.dataset.built) {
+    grid.innerHTML = ALL_COUNTRIES.map(([code, name]) =>
+      '<label><input type="checkbox" value="' + code + '"><span>' + name + '</span></label>').join('');
+    grid.dataset.built = '1';
+  }
+  const selected = new Set(data.countries || []);
+  grid.querySelectorAll('input[type=checkbox]').forEach((cb) => { cb.checked = selected.has(cb.value); });
+  updateGeoipCount();
+
+  const err = data.error ? ' <span class="pill no">出错</span> ' + escapeHtml(data.error) : '';
+  if (!on && !data.active) {
+    $('geoipHint').innerHTML = '已关闭：所有国家/地区都可以尝试连接 SSH。' + err;
+    return;
+  }
+  if (!data.active) {
+    $('geoipHint').innerHTML = '<span class="pill no">未生效</span> 开关已开启但规则不在内核中，SSH 仍然全部放行。' + err;
+    return;
+  }
+  const counts = '白名单 ' + (data.v4Count + data.v6Count) + ' 条网段（IPv4 ' + data.v4Count + ' / IPv6 ' + data.v6Count + '）';
+  const traffic = '，已放行 ' + data.acceptedPackets + '、拒绝 ' + data.rejectedPackets + ' 次新连接';
+  $('geoipHint').innerHTML = '<span class="pill ok">生效中</span> ' + counts + traffic + '。' + (data.error ? err : '');
+}
+
+let _lastTraffic = null;
+let _failedDefault = '';
+let _failedDirty = false;
+
+function failedBytes(text) {
+  return new TextEncoder().encode(String(text || '')).length;
+}
+
+function renderTraffic(data) {
+  if (!data) return;
+  _lastTraffic = data;
+  $('swTraffic').checked = !!data.enabled;
+
+  // Response mode for blocked HTTP/HTTPS clients. Only 80/443 can be answered
+  // by nginx; every other port is still dropped by the kernel.
+  const mode = data.mode === '404' || data.mode === 'redirect' ? data.mode : 'drop';
+  $('tfMode').value = mode;
+  const web = data.webCounts;
+  const counted = web ? ' 当前 nginx 列表：HTTP ' + web.p80 + ' 条、HTTPS ' + web.p443 + ' 条网段。' : '';
+  const modeText = {
+    drop: '被拦截的 80/443 连接会被内核直接丢弃，访客看到的是连接超时；其它端口不受影响。',
+    '404': '被拦截的 80/443 连接交给 nginx 返回 404，访客不会看到连接超时；其它端口仍被丢弃。',
+    redirect: '被拦截的 80/443 连接会 302 跳转到 ' +
+      escapeHtml(data.failedUrl || 'https://blocked.example.com/') + '；其它端口仍被丢弃。',
+  }[mode];
+  const cf = data.cfTrusted;
+  const cfText = cf && (cf.v4 || cf.v6)
+    ? ' 已信任 ' + ((cf.v4 || 0) + (cf.v6 || 0)) + ' 条 Cloudflare 网段：经 Cloudflare 的请求会按访客真实 IP 匹配规则，' +
+      '404 / 失败页模式还会校验 CF-IPCountry（来源：' + escapeHtml(cf.source || 'builtin') + '）。'
+    : '';
+  $('tfModeHint').innerHTML = modeText + counted + cfText;
+
+  // Editable failure page. Do not clobber what the operator is typing, and do
+  // not re-fill while there are unsaved local edits.
+  _failedDefault = data.defaultFailedHtml || _failedDefault;
+  const box = $('tfFailedHtml');
+  if (document.activeElement !== box && !_failedDirty) {
+    box.value = data.failedHtml || '';
+  }
+  const limit = data.maxFailedBytes || 0;
+  const size = failedBytes(box.value);
+  $('tfFailedHint').textContent = (limit ? size + ' / ' + limit + ' 字节' : '') +
+    (_failedDirty ? '（有未保存的修改）' : '');
+
+  const rules = data.rules || [];
+  if (!rules.length) {
+    $('tfRules').innerHTML = '<div class="empty">暂无规则</div>';
+  } else {
+    $('tfRules').innerHTML =
+      '<table><thead><tr><th>优先级</th><th>类型</th><th>匹配</th><th>端口</th><th>动作</th><th>状态</th><th>操作</th></tr></thead><tbody>' +
+      rules.map(tfRuleRow).join('') + '</tbody></table>';
+  }
+
+  // The exemption list is the anti-lockout guarantee: these addresses are
+  // accepted before any rule runs, so "block mainland China" still lets the
+  // operator in. Always show it — it is the answer to "why am I not blocked".
+  const exempt = Array.isArray(data.exemptIps) ? data.exemptIps : [];
+  const exemptText = exempt.length
+    ? ' <br>始终放行（排在所有规则之前，优先级最高）：' +
+      exempt.slice(0, 6).map((ip) => '<span class="mono">' + escapeHtml(ip) + '</span>').join('、') +
+      (exempt.length > 6 ? ' 等共 ' + exempt.length + ' 个地址' : '') + '。'
+    : '';
+
+  if (!data.enabled && !data.active) {
+    $('trafficHint').innerHTML = '已关闭：所有流量按系统默认策略处理。' + exemptText;
+    return;
+  }
+  if (!data.active) {
+    $('trafficHint').innerHTML = '<span class="pill no">未生效</span> 开关已开启但没有生效的规则，当前不拦截任何流量。' +
+      (data.error ? ' ' + escapeHtml(data.error) : '') + exemptText;
+    return;
+  }
+  const active = rules.filter((r) => r.enabled !== false).length;
+  const counts = '已拦截 ' + data.droppedPackets + '、放行 ' + data.allowedPackets +
+    ' 个数据包（IPv4 ' + data.v4Count + ' / IPv6 ' + data.v6Count + ' 条网段）';
+  $('trafficHint').innerHTML = '<span class="pill ok">生效中</span> ' + active + ' 条启用规则，' + counts + '。' +
+    (data.error ? ' ' + escapeHtml(data.error) : '') + exemptText;
+}
+
+function tfRuleRow(r) {
+  const typeLabel = r.type === 'ip' ? '单个 IP' : r.type === 'cidr' ? 'IP 段' : '国家/地区';
+  const match = r.type === 'country'
+    ? ((COUNTRY_NAMES.get(r.value) || r.value.toUpperCase()) + ' (' + r.value + ')')
+    : r.value;
+  const port = r.portLabel || r.port || '80,443';
+  const actionPill = r.action === 'allow' ? '<span class="pill ok">放行</span>' : '<span class="pill no">拦截</span>';
+  const statePill = r.enabled === false ? '<span class="pill warn">停用</span>' : '<span class="pill ok">启用</span>';
+  return '<tr>' +
+    '<td class="mono">' + escapeHtml(String(r.priority)) + '</td>' +
+    '<td>' + typeLabel + '</td>' +
+    '<td class="mono">' + escapeHtml(match) + '</td>' +
+    '<td class="mono">' + escapeHtml(port) + '</td>' +
+    '<td>' + actionPill + '</td>' +
+    '<td>' + statePill + '</td>' +
+    '<td style="white-space:nowrap">' +
+      '<button class="mini" data-tf-edit="' + escapeHtml(r.id) + '">编辑</button> ' +
+      '<button class="mini block" data-tf-del="' + escapeHtml(r.id) + '">删除</button>' +
+    '</td></tr>';
+}
+
+function renderBlocked(data) {
+  const list = (data && data.ips) || [];
+  if (!data || !data.ips) { $('blocked').innerHTML = '<div class="empty">暂无记录</div>'; return; }
+
+  if (data.nftAvailable === false) {
+    $('blockedHint').innerHTML = '<span class="pill no">防火墙不可用</span> ' +
+      escapeHtml(data.nftError || 'nft 命令执行失败，封锁功能当前不可用。');
+  } else {
+    $('blockedHint').textContent =
+      '被封锁的 IP 在 SSH 端口（22）上的连接会被内核直接丢弃。' +
+      '封锁后仍会持续记录被丢弃的尝试次数。共 ' + list.length + ' 个。';
+  }
+
+  if (!list.length) {
+    $('blocked').innerHTML = '<div class="empty">暂无被封锁的 IP</div>';
+    return;
+  }
+
+  renderDataTable('blocked', 'blocked', [
+    {
+      name: 'IP', sort: (r) => r.ip,
+      render: (r) => '<span class="mono">' + escapeHtml(r.ip) + '</span>' +
+        (r.inKernelSet ? '' : ' <span class="pill no">不在规则中</span>'),
+    },
+    {
+      // Manual vs automatic is shown on every row because it changes what the
+      // entry means: a manual block is a decision someone made, an automatic
+      // one is a threshold rule firing and may deserve a second look.
+      name: '来源', sort: (r) => r.source || '',
+      render: (r) => r.source === 'auto'
+        ? '<span class="pill warn">自动</span>'
+        : r.source === 'manual'
+          ? '<span class="pill ok">手动</span>'
+          : '<span class="pill">未知</span>',
+    },
+    { name: '封锁时间', sort: (r) => r.blockedAt || null, render: (r) => fmtTime(r.blockedAt) },
+    { name: '封锁后尝试', sort: (r) => r.droppedSinceBlock || 0, render: (r) => r.droppedSinceBlock || 0 },
+    { name: '内核拦截包数', sort: (r) => r.packets || 0, render: (r) => r.packets || 0 },
+    {
+      name: '国家/地区', sort: (r) => ((r.geo || {}).error ? '' : (r.geo || {}).country || ''),
+      render: (r) => {
+        const g = r.geo || {};
+        return g.error || !g.country ? '—' : escapeHtml([g.country, g.city].filter(Boolean).join(' · '));
+      },
+    },
+    { name: '操作', sort: null, render: (r) => '<button class="mini" data-unblock="' + escapeHtml(r.ip) + '">解锁</button>' },
+  ], list, {
+    defaultCi: 2, defaultDesc: true,
+    emptyText: '暂无被封锁的 IP',
+    afterRender: () => {
+      $('blocked').querySelectorAll('button[data-unblock]').forEach((btn) => {
+        btn.onclick = () => unblockIp(btn.dataset.unblock, btn);
+      });
+    },
+  });
+}
+
+async function blockIp(ip, btn) {
+  if (!confirm('确定封锁 ' + ip + ' 的 SSH 连接吗？\n\n封锁后该 IP 将无法连接本机 22 端口。如果这是你自己的 IP，你会立刻失去访问。')) {
+    return;
+  }
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '处理中…';
+  try {
+    await api('/api/block', { method: 'POST', body: JSON.stringify({ ip }) });
+    toast('已封锁 ' + ip);
+    await loadAll();
+  } catch (e) {
+    toast('封锁失败：' + e.message, 6000);
+    btn.disabled = false;
+    btn.textContent = label;
+  }
+}
+
+async function unblockIp(ip, btn) {
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '处理中…';
+  try {
+    await api('/api/unblock', { method: 'POST', body: JSON.stringify({ ip }) });
+    toast('已解锁 ' + ip);
+    await loadAll();
+  } catch (e) {
+    toast('解锁失败：' + e.message, 6000);
+    btn.disabled = false;
+    btn.textContent = label;
+  }
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
+    ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+async function loadAll() {
+  const [status, history, ips, fails, blockedList, geo, traffic] = await Promise.all([
+    api('/api/status'),
+    api('/api/history'),
+    api('/api/known-ips'),
+    api('/api/ssh-failures'),
+    api('/api/blocked'),
+    api('/api/geoip'),
+    api('/api/trafficfilter'),
+  ]);
+  renderStatus(status);
+  renderHistory(history.alerts || []);
+  renderIps(ips.ips || []);
+  renderFails(fails);
+  renderBlocked(blockedList);
+  renderGeoip(geo);
+  renderTraffic(traffic);
+}
+
+function rulesFromForm() {
+  return {
+    cpuPercent: Number($('rCpu').value),
+    memPercent: Number($('rMem').value),
+    netMbps: Number($('rNet').value),
+    consecutive: Number($('rConsec').value),
+    windowMinutes: Number($('rWinMin').value),
+    windowCount: Number($('rWinCount').value),
+    combine: $('rCombine').value,
+    cooldownMinutes: Number($('rCooldown').value),
+    sshFailCount: Number($('fCount').value),
+    sshFailWindowMinutes: Number($('fWinMin').value),
+    sshFailCooldownMinutes: Number($('fCooldown').value),
+    autoBlockEnabled: $('swAutoBlock').checked,
+    autoBlockCount: Number($('abCount').value),
+    autoBlockWindowMinutes: Number($('abWinMin').value),
+    enabled: $('swResource').checked,
+    sshAlertsEnabled: $('swSsh').checked,
+    sshFailAlertsEnabled: $('swSshFail').checked,
+  };
+}
+
+async function save(patch, note) {
+  const data = await api('/api/config', { method: 'POST', body: JSON.stringify(patch) });
+  fillRules(data.rules);
+  $('swResource').checked = !!data.rules.enabled;
+  $('swSsh').checked = !!data.rules.sshAlertsEnabled;
+  $('swSshFail').checked = !!data.rules.sshFailAlertsEnabled;
+  toast(note || '已保存');
+  loadAll().catch(() => {});
+}
+
+/* ------------------------------------------------------------------ wiring */
+['rCpu','rMem','rNet','rConsec','rWinMin','rWinCount','rCooldown','fCount','fWinMin','fCooldown','abCount','abWinMin'].forEach((id) =>
+  $(id).addEventListener('input', updateHint));
+$('rCombine').addEventListener('change', updateHint);
+
+$('btnSave').onclick = () => save(rulesFromForm(), '规则已保存').catch((e) => toast(e.message));
+$('btnSaveFail').onclick = () => save(rulesFromForm(), '失败判定已保存').catch((e) => toast(e.message));
+$('btnSaveAutoBlock').onclick = () => save(rulesFromForm(), '自动封锁设置已保存').catch((e) => toast(e.message));
+$('btnReset').onclick = () => {
+  const d = { cpuPercent: 85, memPercent: 85, netMbps: 25, consecutive: 3,
+    windowMinutes: 60, windowCount: 10, combine: 'any', cooldownMinutes: 30,
+    sshFailCount: 3, sshFailWindowMinutes: 60, sshFailCooldownMinutes: 60 };
+  fillRules(d);
+  toast('已填入默认值，记得点保存');
+};
+
+$('swResource').onchange = (e) =>
+  save({ enabled: e.target.checked }, e.target.checked ? '资源提醒已开启' : '资源提醒已关闭')
+    .catch((err) => { toast(err.message); e.target.checked = !e.target.checked; });
+
+$('swSsh').onchange = (e) =>
+  save({ sshAlertsEnabled: e.target.checked }, e.target.checked ? '登录提醒已开启' : '登录提醒已关闭')
+    .catch((err) => { toast(err.message); e.target.checked = !e.target.checked; });
+
+$('swSshFail').onchange = (e) =>
+  save({ sshFailAlertsEnabled: e.target.checked }, e.target.checked ? '失败提醒已开启' : '失败提醒已关闭')
+    .catch((err) => { toast(err.message); e.target.checked = !e.target.checked; });
+
+$('swAutoBlock').onchange = (e) => {
+  updateHint();
+  return save({ autoBlockEnabled: e.target.checked },
+    e.target.checked ? '自动封锁已开启' : '自动封锁已关闭')
+    .catch((err) => { toast(err.message); e.target.checked = !e.target.checked; updateHint(); });
+};
+
+// The country filter changes the firewall, so it has its own endpoint instead
+// of the generic /api/config: the server must build and load the rule set
+// *before* the switch is persisted, and a failure must revert the checkbox.
+$('swGeoip').onchange = async (e) => {
+  const enable = e.target.checked;
+  try {
+    await api('/api/geoip/toggle', { method: 'POST', body: JSON.stringify({ enabled: enable }) });
+    toast(enable ? '国家/地区白名单已开启' : '国家/地区白名单已关闭');
+    await loadAll();
+  } catch (err) {
+    e.target.checked = !enable;
+    toast('操作失败：' + err.message, 8000);
+    await loadAll();
+  }
+};
+
+// Country checkboxes: selecting only marks them; the save button posts the
+// selection, and the server rebuilds the table immediately if the filter is
+// live. Auto-saving on every click would rebuild the firewall dozens of times
+// while someone browses the list.
+$('geoipCountryList').addEventListener('change', updateGeoipCount);
+$('geoipSelectAll').onclick = () => {
+  document.querySelectorAll('#geoipCountryList input[type=checkbox]').forEach((cb) => { cb.checked = true; });
+  updateGeoipCount();
+};
+$('geoipSelectNone').onclick = () => {
+  document.querySelectorAll('#geoipCountryList input[type=checkbox]').forEach((cb) => { cb.checked = false; });
+  updateGeoipCount();
+};
+$('btnSaveGeoipCountries').onclick = async () => {
+  const codes = Array.from(document.querySelectorAll('#geoipCountryList input[type=checkbox]:checked'))
+    .map((cb) => cb.value);
+  if (!codes.length) {
+    toast('至少选择一个国家/地区，否则连你自己都连不上');
+    return;
+  }
+  try {
+    await api('/api/config', { method: 'POST', body: JSON.stringify({ geoipCountries: codes }) });
+    toast($('swGeoip').checked ? '国家列表已保存并重新生效' : '国家列表已保存（开关未开启）');
+    await loadAll();
+  } catch (e) {
+    toast('保存失败：' + e.message, 8000);
+  }
+};
+
+/* -------------------------------------------------- network traffic filter */
+
+// Populate the country dropdown once. Same list the SSH allow-list uses.
+$('tfCountry').innerHTML = ALL_COUNTRIES.map(([code, name]) =>
+  '<option value="' + code + '">' + name + '（' + code + '）</option>').join('');
+
+let tfEditingId = null;
+
+function tfResetForm() {
+  tfEditingId = null;
+  $('tfType').value = 'ip';
+  $('tfType').dispatchEvent(new Event('change'));
+  $('tfValue').value = '';
+  $('tfPortPreset').value = '80,443';
+  $('tfPortPreset').dispatchEvent(new Event('change'));
+  $('tfPortCustom').value = '';
+  $('tfAction').value = 'block';
+  $('tfPriority').value = 100;
+  $('tfEnabled').value = '1';
+  $('btnTfSave').textContent = '添加规则';
+  $('btnTfCancel').style.display = 'none';
+  $('tfFormHint').textContent = '';
+}
+
+function tfEditRule(id) {
+  const rules = (_lastTraffic && _lastTraffic.rules) || [];
+  const r = rules.find((x) => x.id === id);
+  if (!r) return;
+  tfEditingId = id;
+  $('tfType').value = r.type;
+  $('tfType').dispatchEvent(new Event('change'));
+  if (r.type === 'country') $('tfCountry').value = r.value;
+  else $('tfValue').value = r.value;
+
+  const presets = Array.from($('tfPortPreset').options).map((o) => o.value);
+  if (presets.includes(r.port)) {
+    $('tfPortPreset').value = r.port;
+  } else {
+    $('tfPortPreset').value = 'custom';
+    $('tfPortCustom').value = String(r.port || '').replace(/^re:/, '');
+  }
+  $('tfPortPreset').dispatchEvent(new Event('change'));
+
+  $('tfAction').value = r.action;
+  $('tfPriority').value = r.priority;
+  $('tfEnabled').value = r.enabled === false ? '0' : '1';
+  $('btnTfSave').textContent = '保存修改';
+  $('btnTfCancel').style.display = '';
+  $('tfFormHint').textContent = '正在编辑，改完点「保存修改」';
+  document.getElementById('sec-trafficfilter').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function tfFormRule() {
+  const type = $('tfType').value;
+  const value = type === 'country' ? $('tfCountry').value : $('tfValue').value.trim();
+  const preset = $('tfPortPreset').value;
+  const port = preset === 'custom' ? $('tfPortCustom').value.trim() : preset;
+  const body = {
+    type,
+    value,
+    action: $('tfAction').value,
+    priority: Number($('tfPriority').value),
+    enabled: $('tfEnabled').value === '1',
+    port,
+  };
+  if (tfEditingId) body.id = tfEditingId;
+  return body;
+}
+
+// The type picker swaps between the free-text IP/CIDR box and the country
+// dropdown; the custom port box is only writable when the preset is "其他".
+$('tfType').onchange = () => {
+  const country = $('tfType').value === 'country';
+  $('tfCountryWrap').style.display = country ? '' : 'none';
+  $('tfValueWrap').style.display = country ? 'none' : '';
+  $('tfValue').placeholder = $('tfType').value === 'cidr' ? '如 198.51.100.0/24' : '如 203.0.113.9';
+};
+$('tfPortPreset').onchange = () => {
+  const custom = $('tfPortPreset').value === 'custom';
+  $('tfPortCustom').disabled = !custom;
+  if (!custom) $('tfPortCustom').value = '';
+};
+
+$('btnTfSave').onclick = async () => {
+  const body = tfFormRule();
+  if (!body.value) {
+    toast(body.type === 'country' ? '请选择国家/地区' : '请填写要匹配的 IP 或网段');
+    return;
+  }
+  if (!body.port) {
+    toast('请在「自定义端口」里填写端口或正则');
+    return;
+  }
+  try {
+    await api('/api/trafficfilter/save', { method: 'POST', body: JSON.stringify(body) });
+    toast(tfEditingId ? '规则已保存' : '规则已添加');
+    tfResetForm();
+    await loadAll();
+  } catch (err) {
+    toast('保存失败：' + err.message, 9000);
+  }
+};
+$('btnTfCancel').onclick = () => tfResetForm();
+
+$('tfRules').addEventListener('click', async (e) => {
+  const editId = e.target.getAttribute('data-tf-edit');
+  const delId = e.target.getAttribute('data-tf-del');
+  if (editId) { tfEditRule(editId); return; }
+  if (!delId) return;
+  if (!confirm('删除这条规则？')) return;
+  try {
+    await api('/api/trafficfilter/delete', { method: 'POST', body: JSON.stringify({ id: delId }) });
+    if (tfEditingId === delId) tfResetForm();
+    toast('已删除');
+    await loadAll();
+  } catch (err) {
+    toast('删除失败：' + err.message, 9000);
+  }
+});
+
+$('swTraffic').onchange = async (e) => {
+  const enable = e.target.checked;
+  try {
+    await api('/api/trafficfilter/toggle', { method: 'POST', body: JSON.stringify({ enabled: enable }) });
+    toast(enable ? '流量过滤已开启' : '流量过滤已关闭');
+    await loadAll();
+  } catch (err) {
+    e.target.checked = !enable;
+    toast('操作失败：' + err.message, 9000);
+    await loadAll();
+  }
+};
+
+function updateFailedHint() {
+  const limit = (_lastTraffic && _lastTraffic.maxFailedBytes) || 0;
+  const size = failedBytes($('tfFailedHtml').value);
+  $('tfFailedHint').textContent = (limit ? size + ' / ' + limit + ' 字节' : '') +
+    (_failedDirty ? '（有未保存的修改）' : '');
+}
+
+// 三种响应模式是互斥的，所以用一个下拉框而不是两个开关。
+$('tfMode').onchange = async (e) => {
+  const mode = e.target.value;
+  const label = { drop: '直接丢弃', '404': '静默失败（404）', redirect: '失败页（跳转）' }[mode] || mode;
+  try {
+    await api('/api/trafficfilter/mode', { method: 'POST', body: JSON.stringify({ mode }) });
+    toast('已切换为：' + label);
+    await loadAll();
+  } catch (err) {
+    toast('切换失败：' + err.message, 9000);
+    await loadAll().catch(() => {});
+  }
+};
+
+$('tfFailedHtml').addEventListener('input', () => {
+  _failedDirty = true;
+  updateFailedHint();
+});
+
+$('btnTfPageSave').onclick = async () => {
+  const html = $('tfFailedHtml').value;
+  const limit = (_lastTraffic && _lastTraffic.maxFailedBytes) || 0;
+  if (limit && failedBytes(html) > limit) {
+    toast('失败页 HTML 超过 ' + limit + ' 字节上限', 9000);
+    return;
+  }
+  try {
+    await api('/api/trafficfilter/failedpage', { method: 'POST', body: JSON.stringify({ html }) });
+    _failedDirty = false;
+    toast('失败页已保存');
+    await loadAll();
+  } catch (err) {
+    toast('保存失败：' + err.message, 9000);
+  }
+};
+
+$('btnTfPageDefault').onclick = () => {
+  if (!_failedDefault) return;
+  if (!confirm('把编辑框恢复为默认失败页？需要再点「保存失败页」才会生效。')) return;
+  $('tfFailedHtml').value = _failedDefault;
+  _failedDirty = true;
+  updateFailedHint();
+};
+
+$('btnTestResource').onclick = async () => {
+  try { await api('/api/test-alert', { method: 'POST', body: JSON.stringify({ kind: 'resource' }) }); toast('测试邮件已发送'); }
+  catch (e) { toast('发送失败：' + e.message, 5000); }
+};
+$('btnTestSsh').onclick = async () => {
+  try { await api('/api/test-alert', { method: 'POST', body: JSON.stringify({ kind: 'ssh' }) }); toast('测试邮件已发送'); }
+  catch (e) { toast('发送失败：' + e.message, 5000); }
+};
+$('btnTestSshFail').onclick = async () => {
+  try { await api('/api/test-alert', { method: 'POST', body: JSON.stringify({ kind: 'ssh-fail' }) }); toast('测试邮件已发送'); }
+  catch (e) { toast('发送失败：' + e.message, 5000); }
+};
+$('btnClearHistory').onclick = async () => {
+  if (!confirm('清空所有 IP 的「首次 / 最近 / 累计」永久记录吗？\n\n不会解锁任何 IP，也不影响当前统计窗口。')) return;
+  try {
+    const r = await api('/api/fail-history/clear', { method: 'POST', body: JSON.stringify({}) });
+    toast('已清空 ' + r.cleared + ' 条历史记录');
+    await loadAll();
+  } catch (e) {
+    toast('清空失败：' + e.message, 6000);
+  }
+};
+
+$('btnRefresh').onclick = () => loadAll().then(() => toast('已刷新')).catch((e) => toast(e.message));
+$('btnLogout').onclick = async () => {
+  await api('/api/logout', { method: 'POST' }).catch(() => {});
+  location.href = '/login';
+};
+
+/* Module index: scroll-spy so the left rail always shows where you are.
+   Clicking a link scrolls natively (html has scroll-behavior:smooth); the
+   observer then updates the highlight as sections pass the top. */
+(() => {
+  const links = Array.from(document.querySelectorAll('.toc a'));
+  const sections = links
+    .map((a) => document.getElementById(a.getAttribute('href').slice(1)))
+    .filter(Boolean);
+  if (!sections.length) return;
+
+  // The header is sticky and wraps to two lines on narrow desktops, so measure
+  // it instead of hard-coding an offset — otherwise the rail slides over it.
+  const syncOffset = () => {
+    document.documentElement.style.setProperty('--hdr', document.querySelector('header').offsetHeight + 'px');
+  };
+  syncOffset();
+  window.addEventListener('resize', syncOffset);
+
+  let current = null;
+  const mark = (id) => {
+    if (id === current) return;
+    current = id;
+    links.forEach((a) => a.classList.toggle('active', a.getAttribute('href') === '#' + id));
+  };
+
+  // Pick the last section whose top has passed just under the sticky header.
+  // IntersectionObserver alone is not enough here: several long cards can be
+  // visible at once, and it only reports entries whose intersection changed,
+  // so it would highlight whichever card happened to change last.
+  const update = () => {
+    const y = document.querySelector('header').offsetHeight + 15;
+    let cur = sections[0];
+    for (const s of sections) {
+      if (s.getBoundingClientRect().top <= y) cur = s;
+      else break;
+    }
+    mark(cur.id);
+  };
+  let ticking = false;
+  document.addEventListener('scroll', () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => { ticking = false; update(); });
+  }, { passive: true });
+  window.addEventListener('resize', () => { syncOffset(); update(); });
+  update();
+})();
+
+(async () => {
+  try {
+    const s = await api('/api/session');
+    csrf = s.csrf;
+    await loadAll();
+    setInterval(() => loadAll().catch(() => {}), 15000);
+  } catch {
+    location.href = '/login';
+  }
+})();
+</script>
+</body>
+</html>

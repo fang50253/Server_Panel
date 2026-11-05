@@ -1,0 +1,14 @@
+{
+  "name": "server-panel",
+  "version": "1.0.0",
+  "description": "Server resource and SSH login monitor with region-based traffic filtering",
+  "main": "server.js",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/monitor.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

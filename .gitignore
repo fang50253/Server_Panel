@@ -1,0 +1,24 @@
+# local deployment secrets (never commit)
+deploy/monitor.env.local
+deploy/*.env.local
+.env
+.env.*
+!.env.example
+!*.env.example
+
+# runtime state
+node_modules/
+npm-debug.log*
+data/
+*.log
+
+# editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*~
+
+# Python bytecode
+__pycache__/
+*.py[cod]
